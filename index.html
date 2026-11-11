@@ -40,7 +40,7 @@ const APP_URL = "https://script.google.com/macros/s/AKfycby-AlLNKH_-BhCAp9vU2CTU
   p.remove();
   f.src = APP_URL + (APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'shell=1&sat=' + sat + '&sab=' + sab;
   // 鍵盤收起後 iOS 偶爾不會把畫面高度還原，這裡主動校正
-  function fit() { f.style.height = window.innerHeight + 'px'; }
+  function fit() { f.style.height = Math.max(document.documentElement.clientHeight, window.innerHeight) + 'px'; }
   fit();
   window.addEventListener('resize', fit);
   window.addEventListener('orientationchange', function () { setTimeout(fit, 300); });
