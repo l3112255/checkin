@@ -13,20 +13,16 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#FBF7F5}
-body{display:flex;flex-direction:column;height:100dvh}
-.top{flex:none;height:env(safe-area-inset-top,0px);background:linear-gradient(90deg,#D8001E 0%,#F2273A 50%,#D8001E 100%)}
-.app{flex:1;min-height:0;border:0;width:100%;display:block;background:#FBF7F5}
-.bot{flex:none;height:env(safe-area-inset-bottom,0px);background:#FFFFFF}
-.msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#7A6E70;background:#FBF7F5;padding:24px;text-align:center;line-height:1.6}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#D8001E}
+.app{position:fixed;left:0;top:0;width:100%;height:100%;border:0;display:block;background:#FBF7F5}
+.msg{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#7A6E70;background:#FBF7F5;padding:24px;text-align:center;line-height:1.6}
 .msg b{color:#B5101F;font-size:20px}
+.probe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
-<div class="top"></div>
 <iframe class="app" id="app" title="貴賓報到"></iframe>
-<div class="bot"></div>
 <div class="msg" id="msg" hidden><b>還沒設定網址</b><span>請用記事本打開 index.html，把點名網址貼到最上面的 APP_URL 引號裡，再重新上傳。</span></div>
 <script>
 // ╔══════════════════════════════════════════════════════════════╗
@@ -37,7 +33,18 @@ const APP_URL = "https://script.google.com/macros/s/AKfycby-AlLNKH_-BhCAp9vU2CTU
 (function () {
   var f = document.getElementById('app');
   if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(APP_URL)) { document.getElementById('msg').hidden = false; return; }
-  f.src = APP_URL + (APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'shell=1';
+  // 量出 iPhone 狀態列與 Home 橫條的高度，交給點名頁自己留白（外殼不畫色條，頂欄的紅色與金緞帶才會連成一片）
+  var p = document.createElement('div'); p.className = 'probe'; document.body.appendChild(p);
+  var cs = getComputedStyle(p);
+  var sat = Math.round(parseFloat(cs.paddingTop) || 0), sab = Math.round(parseFloat(cs.paddingBottom) || 0);
+  p.remove();
+  f.src = APP_URL + (APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'shell=1&sat=' + sat + '&sab=' + sab;
+  // 鍵盤收起後 iOS 偶爾不會把畫面高度還原，這裡主動校正
+  function fit() { f.style.height = window.innerHeight + 'px'; }
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', function () { setTimeout(fit, 300); });
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', function () { setTimeout(fit, 150); });
 })();
 </script>
 </body>
