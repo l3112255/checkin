@@ -18,11 +18,22 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#D8001E}
 .msg{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#7A6E70;background:#FBF7F5;padding:24px;text-align:center;line-height:1.6}
 .msg b{color:#B5101F;font-size:20px}
 .probe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+/* 載入畫面：等 Google 回應的那幾秒，先顯示品牌畫面與進度條，不要讓人看空白 */
+.load{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;text-align:center;
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  background:radial-gradient(130% 90% at 50% 0%,#FF4C57 0%,#D8001E 60%,#D8001E 100%);transition:opacity .3s ease}
+.load.done{opacity:0;pointer-events:none}
+.load small{font-size:14px;letter-spacing:.3em;opacity:.92;margin-right:-.3em}
+.load b{font-size:30px;letter-spacing:.16em;margin-right:-.16em;line-height:1.2}
+.lbar{width:min(64vw,280px);height:8px;border-radius:999px;background:rgba(255,255,255,.28);overflow:hidden;margin-top:10px}
+.lbar i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,#E2C274,#FFF0BF);transition:width .25s linear}
+.load span{font-size:14px;opacity:.95;min-height:1.5em}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <iframe class="app" id="app" title="貴賓報到"></iframe>
+<div class="load" id="load"><small>和泰汽車</small><b>貴賓報到</b><div class="lbar"><i id="lfill"></i></div><span id="lmsg">連線中…</span></div>
 <div class="msg" id="msg" hidden><b>還沒設定網址</b><span>請用記事本打開 index.html，把點名網址貼到最上面的 APP_URL 引號裡，再重新上傳。</span></div>
 <script>
 // ╔══════════════════════════════════════════════════════════════╗
@@ -31,15 +42,34 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#D8001E}
 const APP_URL = "https://script.google.com/macros/s/AKfycby-AlLNKH_-BhCAp9vU2CTUFJ-9XMnErCY2xo7I7gddEufvIv4hDIWALYvL6pK4OTVR/exec";
 
 (function () {
-  var f = document.getElementById('app');
-  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(APP_URL)) { document.getElementById('msg').hidden = false; return; }
+  var f = document.getElementById('app'), load = document.getElementById('load');
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(APP_URL)) { load.hidden = true; document.getElementById('msg').hidden = false; return; }
   // 量出 iPhone 狀態列與 Home 橫條的高度，交給點名頁自己留白（外殼不畫色條，頂欄的紅色與金緞帶才會連成一片）
   var p = document.createElement('div'); p.className = 'probe'; document.body.appendChild(p);
   var cs = getComputedStyle(p);
   var sat = Math.round(parseFloat(cs.paddingTop) || 0), sab = Math.round(parseFloat(cs.paddingBottom) || 0);
   p.remove();
+
+  // 載入進度條：分兩段（① 等 Google 回應 ② 載入名單）。進度是依時間估的，點名頁通知「好了」才走完
+  var fill = document.getElementById('lfill'), msg = document.getElementById('lmsg');
+  var pct = 0, target = 62, done = false, gotPage = false, t0 = Date.now();
+  var timer = setInterval(function () {
+    if (done) return;
+    pct += (target - pct) * 0.06; fill.style.width = pct.toFixed(1) + '%';
+    var sec = (Date.now() - t0) / 1000;
+    if (!gotPage && sec > 8) msg.textContent = 'Google 回應較慢，請稍候…';
+    if (sec > 25) finish();   // 最久等 25 秒就收起來，讓人看得到底下實際的畫面或錯誤訊息
+  }, 120);
+  function finish() {
+    if (done) return; done = true; clearInterval(timer); fill.style.width = '100%';
+    setTimeout(function () { load.classList.add('done'); setTimeout(function () { load.hidden = true; }, 350); }, 180);
+  }
+  f.addEventListener('load', function () { gotPage = true; target = 92; msg.textContent = '載入名單中…'; setTimeout(finish, 3000); });
+  // 點名頁畫面準備好會送這個訊息過來（內容只用來收起載入畫面，不需要驗證來源）
+  window.addEventListener('message', function (ev) { if (ev.data && ev.data.hotai === 'ready') finish(); });
+
   f.src = APP_URL + (APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'shell=1&sat=' + sat + '&sab=' + sab
-    + '&from=' + encodeURIComponent(location.origin + location.pathname);  // 讓點名頁知道外殼網址，「已同步」點開的 QR Code 才會指向這裡
+    + '&from=' + encodeURIComponent(location.origin + location.pathname);  // 備用：點名頁「設定」沒填分享網址時，QR Code 用這個網址
   // 鍵盤收起後 iOS 偶爾不會把畫面高度還原，這裡主動校正
   function fit() { f.style.height = Math.max(document.documentElement.clientHeight, window.innerHeight) + 'px'; }
   fit();
