@@ -49,6 +49,15 @@ const APP_URL = "https://script.google.com/macros/s/AKfycby-AlLNKH_-BhCAp9vU2CTU
   var cs = getComputedStyle(p);
   var sat = Math.round(parseFloat(cs.paddingTop) || 0), sab = Math.round(parseFloat(cs.paddingBottom) || 0);
   p.remove();
+  // 畫面比螢幕短多少（iPhone 主畫面模式會短一截，露出下面的紅底）。三種量法取最大，量不到就是 0；點名頁另有自己的判斷，這個數字主要供診斷
+  var short = 0;
+  try {
+    var vp = Math.max(document.documentElement.clientHeight, window.innerHeight);
+    var q = document.createElement('div'); q.style.cssText = 'position:fixed;left:0;top:0;width:0;height:100vh;visibility:hidden;pointer-events:none'; document.body.appendChild(q);
+    var cand = [q.offsetHeight]; q.style.height = '100lvh'; cand.push(q.offsetHeight); q.remove();
+    if (window.innerHeight > window.innerWidth) cand.push(Math.max(screen.width || 0, screen.height || 0));
+    cand.forEach(function (x) { var g = Math.round(x - vp); if (g > short && g < 200) short = g; });
+  } catch (err) {}
 
   // 載入進度條：分兩段（① 等 Google 回應 ② 載入名單）。進度是依時間估的，點名頁通知「好了」才走完
   var fill = document.getElementById('lfill'), msg = document.getElementById('lmsg');
@@ -68,7 +77,7 @@ const APP_URL = "https://script.google.com/macros/s/AKfycby-AlLNKH_-BhCAp9vU2CTU
   // 點名頁畫面準備好會送這個訊息過來（內容只用來收起載入畫面，不需要驗證來源）
   window.addEventListener('message', function (ev) { if (ev.data && ev.data.hotai === 'ready') finish(); });
 
-  f.src = APP_URL + (APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'shell=1&sat=' + sat + '&sab=' + sab
+  f.src = APP_URL + (APP_URL.indexOf('?') >= 0 ? '&' : '?') + 'shell=1&sat=' + sat + '&sab=' + sab + '&short=' + short
     + '&from=' + encodeURIComponent(location.origin + location.pathname);  // 備用：點名頁「設定」沒填分享網址時，QR Code 用這個網址
   // 鍵盤收起後 iOS 偶爾不會把畫面高度還原，這裡主動校正
   function fit() { f.style.height = Math.max(document.documentElement.clientHeight, window.innerHeight) + 'px'; }
